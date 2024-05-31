@@ -18,6 +18,9 @@ eraser_mode = False  # 기본적으로 지우개 모드는 비활성화
 spacing = 10  # 도형 사이의 최소 간격을 10으로 설정
 last_x, last_y = None, None  # 마지막 마우스 위치를 저장할 변수 초기화
 
+# 되돌리기를 위한 스택 초기화
+undo_stack = []
+
 # 마우스 움직임에 따라 도형을 그리는 함수
 def set_paint_mode_normal():
     canvas.bind("<B1-Motion>", paint)
@@ -37,6 +40,7 @@ def paint_pressure(event):
     x1, y1 = ( event.x - radius ), ( event.y - radius )
     x2, y2 = ( event.x + radius ), ( event.y + radius )
     canvas.create_oval(x1, y1, x2, y2, fill=brush_color, outline=brush_color)
+    undo_stack.append(oval_id)
 
 def paint_start(event):
     global x1, y1
@@ -47,6 +51,7 @@ def paint(event):
     x2, y2 = event.x, event.y
     canvas.create_line(x1, y1, x2, y2, fill=brush_color, width=2)
     x1, y1 = x2, y2
+    undo_stack.append(line_id)
 
 """
 dotted_paint: 점선 브러쉬 함수
@@ -62,6 +67,7 @@ def dotted_paint(event): # 점선 브러쉬 함수
         distance = (dx ** 2 + dy ** 2) ** 0.5
         if distance >= spacing:
             canvas.create_oval(event.x-1, event.y-1, event.x+1, event.y+1, fill="black", outline="black")
+            undo_stack.append(oval_id)
             last_x, last_y = event.x, event.y
     else:
         last_x, last_y = event.x, event.y
@@ -89,12 +95,13 @@ def clear_paint():
     canvas.delete("all")
     global last_x, last_y
     last_x, last_y = None, None # 마지막 좌표 초기화
+    undo_stack.clear()  # 실행 취소 스택 초기화
 
 def add_text(event):# 텍스트 박스의 내용을 가져와서 클릭한 위치에 텍스트를 추가합니다.
 
     text = text_box.get()
     canvas.create_text(event.x, event.y, text=text, fill="black", font=('Arial', 12))
-   
+    undo_stack.append(text_id)   
 
 def toggle_fullscreen(event):
     window.state = not window.state
@@ -118,6 +125,7 @@ def erase(event):
     x1, y1 = ( event.x-3 ), ( event.y-3 )
     x2, y2 = ( event.x+3 ), ( event.y+3 )
     canvas.create_oval(x1, y1, x2, y2, fill=bg_color, outline=bg_color)
+    undo_stack.append(oval_id)
 
 def change_bg_color():
     bg_color = askcolor()
@@ -149,6 +157,7 @@ def draw_shape(event):
         current_shape = canvas.create_oval(shape_start_x, shape_start_y, event.x, event.y, outline=current_color)
     elif selected_shape == "rectangle":
         current_shape = canvas.create_rectangle(shape_start_x, shape_start_y, event.x, event.y, outline=current_color)
+    undo_stack.append(current_shape)
 
 def set_shape_mode(shape):
     global selected_shape
@@ -157,6 +166,11 @@ def set_shape_mode(shape):
     canvas.bind("<B1-Motion>", draw_shape)
     canvas.bind("<ButtonRelease-1>", lambda event: draw_shape(event))
 
+# 되돌리기 기능 추가
+def undo():
+    if undo_stack:
+        last_item = undo_stack.pop()
+        canvas.delete(last_item)
 
 window = Tk()
 #Tk 객체를 생성하여 주 윈도우를 만들기
@@ -229,6 +243,9 @@ button_oval.pack(side=LEFT)
 
 button_rectangle = Button(window, text="빈 사각형", command=lambda: set_shape_mode("rectangle"))
 button_rectangle.pack(side=LEFT)
+
+button_undo = Button(window, text="되돌리기", command=undo)
+button_undo.pack(side=LEFT)
 
 set_paint_mode_normal() # 프로그램 시작 시 기본 그리기 모드 설정
 
